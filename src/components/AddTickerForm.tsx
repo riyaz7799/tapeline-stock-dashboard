@@ -19,6 +19,11 @@ export default function AddTickerForm({ existingSymbols, onAdd }: AddTickerFormP
   const [feedback, setFeedback] = useState('');
   const requestIdRef = useRef(0);
 
+  // Always holds the latest prop, so the debounced search below never
+  // filters against a stale ticker list from an earlier render.
+  const existingSymbolsRef = useRef(existingSymbols);
+  existingSymbolsRef.current = existingSymbols;
+
   const runSearch = async (raw: string) => {
     const query = raw.trim();
     if (!query) {
@@ -33,13 +38,15 @@ export default function AddTickerForm({ existingSymbols, onAdd }: AddTickerFormP
     try {
       const matches = await searchSymbols(query);
       if (requestId !== requestIdRef.current) return; // stale response, ignore
-      const filtered = matches.filter((m) => !existingSymbols.includes(m.symbol.toUpperCase()));
+      const filtered = matches.filter(
+        (m) => !existingSymbolsRef.current.includes(m.symbol.toUpperCase())
+      );
       setResults(filtered);
       setFeedback(filtered.length === 0 ? `No worldwide matches for "${query}"` : '');
-    } catch {
+    } catch (err) {
       if (requestId !== requestIdRef.current) return;
       setResults([]);
-      setFeedback('Search failed — try again');
+      setFeedback(err instanceof Error ? err.message : 'Search failed — try again');
     } finally {
       if (requestId === requestIdRef.current) setIsSearching(false);
     }
